@@ -1,0 +1,58 @@
+# Klik & Play .mus / .snd format
+# by Revenant
+
+endian little
+
+get ext extension
+get filecount long
+
+for i = 0 < filecount
+	get chunk_start long
+	get chunk_size long
+	savepos next_chunk
+	
+	if chunk_size > 0
+		goto chunk_start
+		get dummy1 long    # ???
+		get dummy2 short   # always 0?
+		get filesize long  # chunk_size minus size of header
+		get filename string
+		math chunk_start += 32
+		
+		if ext == "mus"
+			string filename += ".mid"
+			log filename chunk_start filesize
+		elif ext == "snd"
+			string filename += ".wav"
+			
+			math wav_size = filesize
+			math wav_size += 20
+			
+			log MEMORY_FILE 0 0
+			append # on
+			# RIFF header
+			putdstring "RIFF" 4 MEMORY_FILE
+			put wav_size long MEMORY_FILE
+			putdstring "WAVE" 4 MEMORY_FILE
+			
+			# WAV format chunk
+			putdstring "fmt " 4 MEMORY_FILE
+			put 16 long MEMORY_FILE
+			log MEMORY_FILE chunk_start 16
+			math chunk_start += 16
+			math filesize -= 16
+			
+			# WAV data chunk
+			putdstring "data" 4 MEMORY_FILE
+			put filesize long MEMORY_FILE
+			log MEMORY_FILE chunk_start filesize
+			append # off
+			
+			math wav_size += 8 # include RIFF chunk ID and size
+			# write entire file to disk
+			log filename 0 wav_size MEMORY_FILE
+		endif
+	endif
+	
+	goto next_chunk
+next i

@@ -1,0 +1,24 @@
+# Club Dead .dta format
+# by Revenant
+
+endian big
+
+get dirpos long
+goto dirpos
+
+get dummy1 short    # size of file number list
+get filecount short # number of actual files
+get dummy2 short    # size of ??? (additional file number lists after file offsets?)
+
+for i = 0 < dummy1
+	get num short
+next i
+
+get pos long
+for i = 0 < filecount
+	get nextpos long
+	math size = nextpos
+	math size - pos
+	log "" pos size
+	math pos = nextpos
+next i

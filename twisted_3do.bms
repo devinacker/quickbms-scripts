@@ -1,0 +1,45 @@
+# Twisted: The Game Show (3DO) streams
+# by Revenant
+
+endian big
+
+goto 0, 0, SEEK_END
+savepos EOF
+
+goto 0
+savepos here
+
+do
+	getdstring chunk_type 4
+	get chunk_size long
+	
+	if chunk_type == "JOIN"
+		get chunk_id_hi long
+		get chunk_id_lo long
+		getdstring chunk_format 4
+		getdstring chunk_subtype 4
+		
+		string chunk_format _ chunk_format
+		string filename p "%06x_%04x.%s" chunk_id_hi chunk_id_lo chunk_format
+		
+		if chunk_subtype == "JHDR" # start of a new file
+			get chunk_size2 long # ??
+			get dummy1 long
+			get dummy2 long
+			get data_size long
+			savepos data_pos
+			
+			log filename data_pos data_size
+		elif chunk_subtype == "JDAT" # continuation of previous file
+			get data_size long
+			savepos data_pos
+			
+			append # on
+			log filename data_pos data_size
+			append # off
+		endif
+	endif
+	
+	math here += chunk_size
+	goto here
+while here < EOF
