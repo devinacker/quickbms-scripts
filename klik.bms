@@ -1,0 +1,123 @@
+# Klik & Play / Click & Create / The Games Factory resources
+# by Revenant
+
+# Currently extracts sound (.wav) and music (.mid) resources only.
+# This script can be used in three ways:
+# - with a C&C/TGF .gam or .cca file
+# - with a K&P .gam file (will open the additional files automatically)
+# - with a K&P .mus or .snd file
+
+endian little
+
+get ext extension
+
+if ext == "gam" || ext == "cca"
+	goto 1
+	getdstring file_fmt 3
+	get file_ver short
+	
+	if file_fmt != "AME" && file_fmt != "APP"
+		print "Not a valid GAM/CCA file!"
+		exit
+	
+	elif file_ver >= 0x300
+		print "Unsupported format version %file_ver|4x%"
+		exit
+	
+	elif file_ver >= 0x200
+		# format version 2: Click & Create / The Games Factory
+		
+		goto 0x160
+		set last_chunk short 0
+		do
+			get chunk_type short
+			get chunk_size long
+			savepos chunk_start
+			
+			if chunk_type & 0x8000
+				set last_chunk short 1
+				math chunk_type &= 0x7fff
+			endif
+			
+		#	print "chunk type %chunk_type|2x% at offset %chunk_start|6x% (%chunk_size% bytes)"
+			if chunk_type == 0x0c
+				callfunction DumpAssets 0 chunk_start "mus"
+			elif chunk_type == 0x0d
+				callfunction DumpAssets 0 chunk_start "snd"
+			endif
+			
+			math chunk_start += chunk_size
+			goto chunk_start
+		while last_chunk == 0		
+	
+	elif file_ver >= 0x100
+		# format version 1: Klik & Play
+		
+		open fdde mus
+		callfunction DumpAssets 0 0 "mus"
+
+		open fdde snd
+		callfunction DumpAssets 0 0 "snd"
+	endif
+elif ext == "mus" || ext == "snd"
+	callfunction DumpAssets 0 0 ext
+endif
+
+startfunction DumpAssets
+	math chunk_start = DumpAssets_ARG1
+	string data_type = DumpAssets_ARG2
+	
+	goto chunk_start
+	get filecount long
+	for i = 0 < filecount
+		get data_start long
+		math data_start += chunk_start
+		get data_size long
+		savepos next_chunk
+		
+		if data_size > 0
+			goto data_start
+			get dummy1 long   # ???
+			get dummy2 short  # always 0?
+			get filesize long # data_size minus size of header
+			get filename string
+			math data_start += 32
+			
+			if data_type == "mus"
+				string filename += ".mid"
+				log filename data_start filesize
+			elif data_type == "snd"
+				string filename += ".wav"
+				
+				math wav_size = filesize
+				math wav_size += 20
+				
+				log MEMORY_FILE 0 0
+				append # on
+				# RIFF header
+				putdstring "RIFF" 4 MEMORY_FILE
+				put wav_size long MEMORY_FILE
+				putdstring "WAVE" 4 MEMORY_FILE
+				
+				# WAV format chunk
+				putdstring "fmt " 4 MEMORY_FILE
+				put 16 long MEMORY_FILE
+				log MEMORY_FILE data_start 16
+				math data_start += 16
+				math filesize -= 16
+				
+				# WAV data chunk
+				putdstring "data" 4 MEMORY_FILE
+				put filesize long MEMORY_FILE
+				log MEMORY_FILE data_start filesize
+				append # off
+				
+				math wav_size += 8 # include RIFF chunk ID and size
+				# write entire file to disk
+				log filename 0 wav_size MEMORY_FILE
+			endif
+		endif
+		
+		goto next_chunk
+	next i
+endfunction
