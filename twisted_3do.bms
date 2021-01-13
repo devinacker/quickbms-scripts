@@ -3,10 +3,7 @@
 
 endian big
 
-goto 0, 0, SEEK_END
-savepos EOF
-
-goto 0
+get EOF asize
 savepos here
 
 do
