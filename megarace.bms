@@ -1,0 +1,15 @@
+# MegaRace (megarace.dat)
+# by Revenant
+
+endian little
+
+get filecount short
+for i = 0 < filecount
+	getdstring filename 16
+	get size long
+	get offset long
+	get dummy byte
+	if size > 0
+		log filename offset size
+	endif
+next i
